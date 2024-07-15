@@ -1,106 +1,196 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Rust Treatment Guide</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-        }
-        .question {
-            margin-bottom: 20px;
-        }
-        .question label {
-            display: block;
-            margin-bottom: 8px;
-        }
-        .question select, .question input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-        }
-        .result {
-            margin-top: 20px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>Car Rust Treatment Guide</h1>
-    <div class="question">
-        <label for="rust-type">What is the current state of your car's rust issue?</label>
-        <select id="rust-type">
-            <option value="none">No rust, I want to prevent it</option>
-            <option value="surface">Surface rust (minor rust spots)</option>
-            <option value="scale">Scaling rust (more severe, flaky rust)</option>
-            <option value="penetrating">Penetrating rust (rust has created holes)</option>
-        </select>
-    </div>
-    <div class="question">
-        <label for="location">Where is the rust located?</label>
-        <select id="location">
-            <option value="underside">Underside of the car</option>
-            <option value="engine">Under the hood/Engine compartment</option>
-            <option value="body">Body panels/Exterior surface</option>
-            <option value="interior">Interior parts (e.g., floorboards)</option>
-        </select>
-    </div>
-    <div class="question">
-        <label for="environment">What kind of environment does your car typically experience?</label>
-        <select id="environment">
-            <option value="dry">Dry climate</option>
-            <option value="humid">Humid climate</option>
-            <option value="coastal">Coastal area (exposed to saltwater)</option>
-            <option value="winter">Winter conditions (exposed to road salt)</option>
-        </select>
-    </div>
-    <button onclick="getRecommendation()">Get Recommendation</button>
-    
-    <div class="result" id="result"></div>
-</div>
-
-<script>
-    function getRecommendation() {
-        const rustType = document.getElementById('rust-type').value;
-        const location = document.getElementById('location').value;
-        const environment = document.getElementById('environment').value;
-        let recommendation = '';
-
-        if (rustType === 'none') {
-            if (location === 'underside') {
-                recommendation = 'For preventing rust on the underside of your car, use 3M Rubberized Undercoating. It provides a protective barrier against moisture and road debris.';
-            } else if (location === 'engine') {
-                recommendation = 'For preventing rust under the hood, use WD-40 Specialist Long-Term Corrosion Inhibitor. It protects metal parts from moisture and corrosion.';
-            } else if (location === 'body') {
-                recommendation = 'For preventing rust on the body panels, use Fluid Film. It creates a protective coating that prevents rust.';
-            } else if (location === 'interior') {
-                recommendation = 'For preventing rust on interior parts, use a rust inhibitor spray like Rust-Oleum Stops Rust. It can be applied to metal surfaces to prevent rust formation.';
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Notepad</title>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/neat.min.css"
+        />
+        <style>
+            body,
+            html {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                background-color: #130f40;
+                color: #ffffff;
+                font-family: "Courier New", Courier, monospace;
+                overflow: hidden;
+                display: flex;
             }
-        } else if (rustType === 'surface') {
-            recommendation = 'To treat surface rust, use Rust-Oleum Rust Reformer. It converts rust to a paintable surface and stops further rusting.';
-        } else if (rustType === 'scale') {
-            recommendation = 'For scaling rust, use POR-15 Rust Preventive Coating. It seals the rust and prevents it from spreading.';
-        } else if (rustType === 'penetrating') {
-            recommendation = 'For penetrating rust, you might need to replace the affected parts. However, you can use POR-15 Rust Preventive Coating to treat and stabilize the remaining rust.';
-        }
+            .editor-container {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+            .sticky-button {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background-color: #555;
+                color: #fff;
+                border: none;
+                padding: 5px 10px;
+                cursor: pointer;
+                font-size: 14px;
+                border-radius: 5px;
+                z-index: 999;
+                margin-left: 5px;
+            }
+            .sticky-button.on {
+                color: #00ff00; /* Matrix green */
+            }
+            .CodeMirror {
+                flex: 1;
+                font-size: 16px;
+                padding: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="editor-container">
+            <button id="toggle-js" class="sticky-button">Text Mode</button>
+            <button
+                id="toggle-theme"
+                class="sticky-button"
+                style="right: 100px"
+            >
+                Light Mode
+            </button>
+            <textarea id="notepad" placeholder="Start typing..."></textarea>
+        </div>
 
-        document.getElementById('result').innerText = recommendation;
-    }
-</script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/matchbrackets.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/keymap/sublime.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/standalone.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/parser-babel.js"></script>
 
-</body>
+        <script>
+            console.log(
+                "COMMANDS:\nCTRL+S = download document\nAlt+Enter = run code\nCTRL+SHIFT+F = prettify code"
+            );
+
+            // Initialize CodeMirror
+            const textarea = document.getElementById("notepad");
+            const editor = CodeMirror.fromTextArea(textarea, {
+                mode: null, // Initially in plain text mode
+                theme: "neat",
+                lineNumbers: true,
+                matchBrackets: true,
+                tabSize: 4,
+                indentUnit: 4,
+                indentWithTabs: true,
+                keyMap: "sublime",
+                lineWrapping: true, // Enable line wrapping
+            });
+
+            const toggleJsButton = document.getElementById("toggle-js");
+            const toggleThemeButton = document.getElementById("toggle-theme");
+            let isJsMode = false;
+            let isDarkMode = false;
+
+            toggleJsButton.addEventListener("click", () => {
+                isJsMode = !isJsMode;
+                editor.setOption("mode", isJsMode ? "javascript" : null);
+                editor.setOption(
+                    "theme",
+                    isJsMode
+                        ? isDarkMode
+                            ? "dracula"
+                            : "neat"
+                        : isDarkMode
+                        ? "dracula"
+                        : "neat"
+                );
+                toggleJsButton.textContent = isJsMode ? "JS Mode" : "Text Mode";
+                toggleJsButton.classList.toggle("on", isJsMode);
+            });
+
+            toggleThemeButton.addEventListener("click", () => {
+                isDarkMode = !isDarkMode;
+                editor.setOption("theme", isDarkMode ? "dracula" : "neat");
+                toggleThemeButton.textContent = isDarkMode
+                    ? "Dark Mode"
+                    : "Light Mode";
+                toggleThemeButton.classList.toggle("on", isDarkMode);
+            });
+
+            // Load saved content from localStorage
+            editor.setValue(localStorage.getItem("notepadContent") || "");
+
+            // Save content to localStorage on change
+            editor.on("change", () => {
+                localStorage.setItem("notepadContent", editor.getValue());
+            });
+
+            // Save file on Ctrl+S
+            document.addEventListener("keydown", (event) => {
+                if (event.ctrlKey && event.key === "s") {
+                    event.preventDefault();
+                    const fileName = prompt("Enter file name:", "untitled.txt");
+                    if (fileName) {
+                        const blob = new Blob([editor.getValue()], {
+                            type: "text/plain",
+                        });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                        }, 0);
+                    }
+                }
+            });
+
+            // Prettify code on Ctrl+Shift+F
+            document.addEventListener("keydown", (event) => {
+                if (event.ctrlKey && event.shiftKey && event.key === "F") {
+                    event.preventDefault();
+                    if (isJsMode) {
+                        const prettyCode = prettier.format(editor.getValue(), {
+                            parser: "babel",
+                            plugins: prettierPlugins,
+                        });
+                        editor.setValue(prettyCode);
+                    }
+                }
+            });
+
+            // Run code on Alt+Enter
+            document.addEventListener("keydown", (event) => {
+                if (event.altKey && event.key === "Enter") {
+                    event.preventDefault();
+                    if (isJsMode) {
+                        try {
+                            console.clear();
+                            eval(editor.getValue());
+                        } catch (error) {
+                            console.error(error);
+                        }
+                    }
+                }
+            });
+        </script>
+    </body>
 </html>
