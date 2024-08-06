@@ -1,196 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Notepad</title>
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/neat.min.css"
-        />
-        <style>
-            body,
-            html {
-                margin: 0;
-                padding: 0;
-                width: 100%;
-                height: 100%;
-                background-color: #130f40;
-                color: #ffffff;
-                font-family: "Courier New", Courier, monospace;
-                overflow: hidden;
-                display: flex;
-            }
-            .editor-container {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-            }
-            .sticky-button {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background-color: #555;
-                color: #fff;
-                border: none;
-                padding: 5px 10px;
-                cursor: pointer;
-                font-size: 14px;
-                border-radius: 5px;
-                z-index: 999;
-                margin-left: 5px;
-            }
-            .sticky-button.on {
-                color: #00ff00; /* Matrix green */
-            }
-            .CodeMirror {
-                flex: 1;
-                font-size: 16px;
-                padding: 10px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="editor-container">
-            <button id="toggle-js" class="sticky-button">Text Mode</button>
-            <button
-                id="toggle-theme"
-                class="sticky-button"
-                style="right: 100px"
-            >
-                Light Mode
-            </button>
-            <textarea id="notepad" placeholder="Start typing..."></textarea>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notepad</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/neat.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/eclipse.min.css">
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #282a36;
+            color: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .navbar {
+            background-color: #282a36;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            visibility: hidden;
+        }
+
+        .sticky-dropdown {
+            background-color: #555;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            font-size: 14px;
+            border-radius: 5px;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+
+        .CodeMirror {
+            flex: 1;
+            font-size: 16px;
+            padding: 10px;
+            line-height: 1.5em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="navbar">
+        <div>
+            <select id="mode-selector" class="sticky-dropdown">
+                <option value="null">Text Mode</option>
+                <option value="javascript">JavaScript Mode</option>
+            </select>
+            <select id="theme-selector" class="sticky-dropdown">
+                <option value="neat">Neat</option>
+                <option value="dracula">Dracula</option>
+                <option value="monokai">Monokai</option>
+                <option value="eclipse">Eclipse</option>
+            </select>
         </div>
+    </div>
+    <div class="editor-container">
+        <textarea id="notepad" placeholder="Start typing..."></textarea>
+    </div>
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/matchbrackets.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/keymap/sublime.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/standalone.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/parser-babel.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/keymap/sublime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/standalone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/parser-babel.js"></script>
 
-        <script>
-            console.log(
-                "COMMANDS:\nCTRL+S = download document\nAlt+Enter = run code\nCTRL+SHIFT+F = prettify code"
-            );
+    <script>
+        console.log("COMMANDS:\nCTRL+S = download document\nAlt+Enter = run code\nCTRL+SHIFT+F = prettify code");
 
-            // Initialize CodeMirror
-            const textarea = document.getElementById("notepad");
-            const editor = CodeMirror.fromTextArea(textarea, {
-                mode: null, // Initially in plain text mode
-                theme: "neat",
-                lineNumbers: true,
-                matchBrackets: true,
-                tabSize: 4,
-                indentUnit: 4,
-                indentWithTabs: true,
-                keyMap: "sublime",
-                lineWrapping: true, // Enable line wrapping
-            });
+        // Initialize CodeMirror
+        const textarea = document.getElementById('notepad');
+        const editorContainer = document.querySelector('.editor-container');
+        const editor = CodeMirror.fromTextArea(textarea, {
+            mode: null, // Initially in plain text mode
+            theme: 'neat',
+            lineNumbers: true,
+            matchBrackets: true,
+            tabSize: 4,
+            indentUnit: 4,
+            indentWithTabs: true,
+            keyMap: 'sublime',
+            lineWrapping: true // Enable line wrapping
+        });
 
-            const toggleJsButton = document.getElementById("toggle-js");
-            const toggleThemeButton = document.getElementById("toggle-theme");
-            let isJsMode = false;
-            let isDarkMode = false;
+        const modeSelector = document.getElementById('mode-selector');
+        const themeSelector = document.getElementById('theme-selector');
 
-            toggleJsButton.addEventListener("click", () => {
-                isJsMode = !isJsMode;
-                editor.setOption("mode", isJsMode ? "javascript" : null);
-                editor.setOption(
-                    "theme",
-                    isJsMode
-                        ? isDarkMode
-                            ? "dracula"
-                            : "neat"
-                        : isDarkMode
-                        ? "dracula"
-                        : "neat"
-                );
-                toggleJsButton.textContent = isJsMode ? "JS Mode" : "Text Mode";
-                toggleJsButton.classList.toggle("on", isJsMode);
-            });
+        modeSelector.addEventListener('change', () => {
+            const selectedMode = modeSelector.value;
+            editor.setOption('mode', selectedMode === "null" ? null : selectedMode);
+        });
 
-            toggleThemeButton.addEventListener("click", () => {
-                isDarkMode = !isDarkMode;
-                editor.setOption("theme", isDarkMode ? "dracula" : "neat");
-                toggleThemeButton.textContent = isDarkMode
-                    ? "Dark Mode"
-                    : "Light Mode";
-                toggleThemeButton.classList.toggle("on", isDarkMode);
-            });
+        themeSelector.addEventListener('change', () => {
+            const selectedTheme = themeSelector.value;
+            editor.setOption('theme', selectedTheme);
+        });
 
-            // Load saved content from localStorage
-            editor.setValue(localStorage.getItem("notepadContent") || "");
+        // Load saved content from localStorage
+        editor.setValue(localStorage.getItem('notepadContent') || '');
 
-            // Save content to localStorage on change
-            editor.on("change", () => {
-                localStorage.setItem("notepadContent", editor.getValue());
-            });
+        // Save content to localStorage on change
+        editor.on('change', () => {
+            localStorage.setItem('notepadContent', editor.getValue());
+        });
 
-            // Save file on Ctrl+S
-            document.addEventListener("keydown", (event) => {
-                if (event.ctrlKey && event.key === "s") {
-                    event.preventDefault();
-                    const fileName = prompt("Enter file name:", "untitled.txt");
-                    if (fileName) {
-                        const blob = new Blob([editor.getValue()], {
-                            type: "text/plain",
-                        });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = fileName;
-                        document.body.appendChild(a);
-                        a.click();
-                        setTimeout(() => {
-                            document.body.removeChild(a);
-                            window.URL.revokeObjectURL(url);
-                        }, 0);
+        // Save file on Ctrl+S
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.key === 's') {
+                event.preventDefault();
+                const fileName = prompt('Enter file name:', 'untitled.txt');
+                if (fileName) {
+                    const blob = new Blob([editor.getValue()], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 0);
+                }
+            }
+        });
+
+        // Prettify code on Ctrl+Shift+F
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.shiftKey && event.key === 'F') {
+                event.preventDefault();
+                if (editor.getOption('mode') === 'javascript') {
+                    const prettyCode = prettier.format(editor.getValue(), { parser: "babel", plugins: prettierPlugins });
+                    editor.setValue(prettyCode);
+                }
+            }
+        });
+
+        // Run code on Alt+Enter
+        document.addEventListener('keydown', (event) => {
+            if (event.altKey && event.key === 'Enter') {
+                event.preventDefault();
+                if (editor.getOption('mode') === 'javascript') {
+                    try {
+                        console.clear();
+                        eval(editor.getValue());
+                    } catch (error) {
+                        console.error(error);
                     }
                 }
-            });
+            }
+        });
 
-            // Prettify code on Ctrl+Shift+F
-            document.addEventListener("keydown", (event) => {
-                if (event.ctrlKey && event.shiftKey && event.key === "F") {
-                    event.preventDefault();
-                    if (isJsMode) {
-                        const prettyCode = prettier.format(editor.getValue(), {
-                            parser: "babel",
-                            plugins: prettierPlugins,
-                        });
-                        editor.setValue(prettyCode);
-                    }
-                }
-            });
+        // Show editor container and focus editor after a timeout
+        setTimeout(() => {
+            editorContainer.style.visibility = 'visible';
+            editor.focus();
+        }, 1000);
+    </script>
+</body>
 
-            // Run code on Alt+Enter
-            document.addEventListener("keydown", (event) => {
-                if (event.altKey && event.key === "Enter") {
-                    event.preventDefault();
-                    if (isJsMode) {
-                        try {
-                            console.clear();
-                            eval(editor.getValue());
-                        } catch (error) {
-                            console.error(error);
-                        }
-                    }
-                }
-            });
-        </script>
-    </body>
 </html>
