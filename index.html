@@ -92,9 +92,14 @@
         // Initialize CodeMirror
         const textarea = document.getElementById('notepad');
         const editorContainer = document.querySelector('.editor-container');
+
+        // Retrieve saved mode and theme from localStorage
+        const savedMode = localStorage.getItem('notepadMode') || 'null';
+        const savedTheme = localStorage.getItem('notepadTheme') || 'neat';
+
         const editor = CodeMirror.fromTextArea(textarea, {
-            mode: null, // Initially in plain text mode
-            theme: 'neat',
+            mode: savedMode === 'null' ? null : savedMode, // Load saved mode
+            theme: savedTheme, // Load saved theme
             lineNumbers: true,
             matchBrackets: true,
             tabSize: 4,
@@ -107,14 +112,20 @@
         const modeSelector = document.getElementById('mode-selector');
         const themeSelector = document.getElementById('theme-selector');
 
+        // Set the selectors to the saved values
+        modeSelector.value = savedMode;
+        themeSelector.value = savedTheme;
+
         modeSelector.addEventListener('change', () => {
             const selectedMode = modeSelector.value;
             editor.setOption('mode', selectedMode === "null" ? null : selectedMode);
+            localStorage.setItem('notepadMode', selectedMode); // Save selected mode
         });
 
         themeSelector.addEventListener('change', () => {
             const selectedTheme = themeSelector.value;
             editor.setOption('theme', selectedTheme);
+            localStorage.setItem('notepadTheme', selectedTheme); // Save selected theme
         });
 
         // Load saved content from localStorage
@@ -163,7 +174,7 @@
                 event.preventDefault();
                 if (editor.getOption('mode') === 'javascript') {
                     try {
-                        // console.clear();
+                        console.clear();
                         eval(editor.getValue());
                     } catch (error) {
                         console.error(error);
