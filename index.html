@@ -1,205 +1,181 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notepad</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/neat.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/eclipse.min.css">
+    <title>Notepad Pro</title>
     <style>
-        body,
-        html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #282a36;
-            color: #ffffff;
-            font-family: 'Courier New', Courier, monospace;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+        :root {
+            --bg: #282a36;
+            --navbar: #191a21;
+            --panel: #44475a;
+            --accent: #bd93f9;
+            --text: #f8f8f2;
+            --green: #50fa7b;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background: var(--bg); color: var(--text);
+            font-size: 18px;
+            font-family: 'Inter', sans-serif;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
         .navbar {
-            background-color: #282a36;
-            padding: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: fixed;
-            top: 0;
-            z-index: 1000;
-            width: 100%;
-            height: 40px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            height: 45px; background: var(--navbar);
+            display: flex; align-items: center; padding: 0 15px;
+            justify-content: space-between; border-bottom: 1px solid #000;
+            z-index: 100;
         }
 
-        .editor-container {
-            width: 100%;
-            height: 100%;
-            margin-top:50px;
-            margin-bottom:50px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            visibility: hidden;
+        #editor-container { flex: 1; position: relative; overflow: hidden; }
+
+        #console-drawer {
+            height: 0; background: #111; border-top: 2px solid var(--accent);
+            transition: height 0.3s ease; overflow: hidden;
+            display: flex; flex-direction: column;
         }
 
-        .sticky-dropdown {
-            background-color: #555;
-            color: #fff;
-            border: none;
-            padding: 5px 10px;
-            font-size: 14px;
-            border-radius: 5px;
-            margin-left: 5px;
-            cursor: pointer;
+        #console-drawer.open { height: 30%; }
+
+        #console-header {
+            padding: 5px 15px; font-size: 16px; 
+            background: #1d1d1d; color: var(--accent);
+            display: flex; justify-content: space-between;
         }
 
-        .CodeMirror {
-            flex: 1;
-            padding: 10px;
-            font-size: 16px;
-            line-height: 1.5em;
-            margin-bottom: 50px;
+        #console-output {
+            flex: 1; padding: 10px; font-family: 'Fira Code', monospace;
+            font-size: 14px; color: var(--green); overflow-y: auto;
+            white-space: pre-wrap;
         }
+
+        .cm-editor { height: 100% !important; }
+        /* Word Wrap Fix */
+        .cm-content { white-space: pre-wrap !important; word-break: break-word !important; }
     </style>
 </head>
-
 <body>
+
     <div class="navbar">
         <div>
-            <select id="mode-selector" class="sticky-dropdown">
-                <option value="null">Text Mode</option>
-                <option value="javascript">JavaScript Mode</option>
-            </select>
-            <select id="theme-selector" class="sticky-dropdown">
-                <option value="neat">Neat</option>
-                <option value="dracula">Dracula</option>
-                <option value="monokai">Monokai</option>
-                <option value="eclipse">Eclipse</option>
-            </select>
+            <span style="font-size: 12px; color: #6272a4;">JS Mode | Ctrl + ~ for Console;</span>
         </div>
-    </div>
-    <div class="editor-container">
-        <textarea id="notepad" placeholder="Start typing..."></textarea>
+        <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/matchbrackets.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/keymap/sublime.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/standalone.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prettier/2.3.2/parser-babel.js"></script>
+    <div id="editor-container"></div>
 
-    <script>
-        console.log("COMMANDS:\nCTRL+S = download document\nAlt+Enter = run code\nCTRL+SHIFT+F = prettify code");
+    <div id="console-drawer">
+        <div id="console-header">
+            <span>CONSOLE OUTPUT</span>
+            <div>
+	            <span onclick="clearConsole()" style="cursor:pointer; margin-right: 20px;">[Clear]</span>
+	            <span onclick="toggleConsole()" style="cursor:pointer">[Close]</span>
+            </div>
+        </div>
+        <div id="console-output"></div>
+    </div>
 
-        // Initialize CodeMirror
-        const textarea = document.getElementById('notepad');
-        const editorContainer = document.querySelector('.editor-container');
+    <script type="module">
+        import { EditorView, basicSetup } from "https://esm.sh/codemirror";
+        import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
+        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
+        import { keymap } from "https://esm.sh/@codemirror/view";
+        import { searchKeymap } from "https://esm.sh/@codemirror/search";
 
-        // Retrieve saved mode and theme from localStorage
-        const savedMode = localStorage.getItem('notepadMode') || 'null';
-        const savedTheme = localStorage.getItem('notepadTheme') || 'neat';
+        const output = document.getElementById('console-output');
+        const drawer = document.getElementById('console-drawer');
+        const indicator = document.getElementById('save-indicator');
 
-        const editor = CodeMirror.fromTextArea(textarea, {
-            mode: savedMode === 'null' ? null : savedMode, // Load saved mode
-            theme: savedTheme, // Load saved theme
-            lineNumbers: true,
-            matchBrackets: true,
-            tabSize: 4,
-            indentUnit: 4,
-            indentWithTabs: true,
-            keyMap: 'sublime',
-            lineWrapping: true // Enable line wrapping
-        });
+        // --- 1. Debounce Logic ---
+        let saveTimeout;
+        const debouncedSave = (content) => {
+            indicator.innerText = "⏳ Typing...";
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                localStorage.setItem('notepadContent', content);
+                indicator.innerText = "✅ Saved";
+            }, 1000); // 1000ms delay
+        };
 
-        const modeSelector = document.getElementById('mode-selector');
-        const themeSelector = document.getElementById('theme-selector');
+        // --- Console Logic ---
+        const logToConsole = (...args) => {
+            const formatted = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' ');
+            output.innerText += `\n> ${formatted}`;
+            output.scrollTop = output.scrollHeight;
+        };
 
-        // Set the selectors to the saved values
-        modeSelector.value = savedMode;
-        themeSelector.value = savedTheme;
+        window.runCode = () => {
+            if (!drawer.classList.contains('open')) toggleConsole();
+            const code = view.state.doc.toString();
+            const wrappedCode = `(async () => { 
+                const console = { log: (...args) => window.parentLog(...args) };
+                try { ${code} } catch(e) { console.log('Error: ' + e.message) }
+            })()`;
+            window.parentLog = logToConsole;
+            new Function(wrappedCode)();
+        };
 
-        modeSelector.addEventListener('change', () => {
-            const selectedMode = modeSelector.value;
-            editor.setOption('mode', selectedMode === "null" ? null : selectedMode);
-            localStorage.setItem('notepadMode', selectedMode); // Save selected mode
-        });
+        window.toggleConsole = () => {
+            drawer.classList.toggle('open');
+            setTimeout(() => view.focus(), 350);
+        };
 
-        themeSelector.addEventListener('change', () => {
-            const selectedTheme = themeSelector.value;
-            editor.setOption('theme', selectedTheme);
-            localStorage.setItem('notepadTheme', selectedTheme); // Save selected theme
-        });
+        window.clearConsole = () => {
+            output.innerText = "";
+        };
 
-        // Load saved content from localStorage
-        editor.setValue(localStorage.getItem('notepadContent') || '');
-
-        // Save content to localStorage on change
-        editor.on('change', () => {
-            localStorage.setItem('notepadContent', editor.getValue());
-        });
-
-        // Save file on Ctrl+S
-        document.addEventListener('keydown', (event) => {
-            if (event.ctrlKey && event.key === 's') {
-                event.preventDefault();
-                const fileName = prompt('Enter file name:', 'untitled.txt');
-                if (fileName) {
-                    const blob = new Blob([editor.getValue()], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = fileName;
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                    }, 0);
-                }
-            }
-        });
-
-        // Prettify code on Ctrl+Shift+F
-        document.addEventListener('keydown', (event) => {
-            if (event.ctrlKey && event.shiftKey && event.key === 'F') {
-                event.preventDefault();
-                if (editor.getOption('mode') === 'javascript') {
-                    const prettyCode = prettier.format(editor.getValue(), { parser: "babel", plugins: prettierPlugins });
-                    editor.setValue(prettyCode);
-                }
-            }
-        });
-
-        // Run code on Alt+Enter
-        document.addEventListener('keydown', (event) => {
-            if (event.altKey && event.key === 'Enter') {
-                event.preventDefault();
-                if (editor.getOption('mode') === 'javascript') {
-                    try {
-                        // console.clear();
-                        eval(editor.getValue());
-                    } catch (error) {
-                        console.error(error);
+        // --- 2. Editor Setup with Autofocus ---
+        const view = new EditorView({
+            doc: localStorage.getItem('notepadContent') || "",
+            extensions: [
+                basicSetup,
+                javascript(),
+                oneDark,
+                EditorView.lineWrapping, // Enable Word Wrap
+                keymap.of(searchKeymap),
+                EditorView.updateListener.of((update) => {
+                    if (update.docChanged) {
+                        debouncedSave(update.state.doc.toString());
                     }
-                }
-            }
+                })
+            ],
+            parent: document.getElementById('editor-container')
         });
 
-        // Show editor container and focus editor after a timeout
-        setTimeout(() => {
-            editorContainer.style.visibility = 'visible';
-            editor.focus();
-        }, 1000);
+        // Autofocus on load
+        view.focus();
+
+        // Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && (e.key === '`' || e.key === '~')) {
+                e.preventDefault();
+                toggleConsole();
+            }
+		window.addEventListener('keydown', (e) => {
+		    if (e.altKey && e.key === 'Backspace') {
+		        e.preventDefault();
+		        clearConsole();			        
+		    }
+		});
+        if (e.altKey && e.key === 'Enter') {
+            e.preventDefault();
+            runCode();
+        }
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            const blob = new Blob([view.state.doc.toString()], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.download = 'note.js'; a.href = url; a.click();
+        }
+        });
+
+        window.view = view;
     </script>
 </body>
-
 </html>
