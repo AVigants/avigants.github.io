@@ -232,8 +232,8 @@
                     a.href = url;
                     a.click();
                 }
-                // Shift + Alt + F to Format
-                if (e.shiftKey && e.altKey && e.key.toLowerCase() === 'f') {
+                // CTRL + Shift + F to Format
+                if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
                     e.preventDefault();
                     formatCode();
                 }
