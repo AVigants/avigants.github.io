@@ -1,181 +1,244 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notepad Pro</title>
-    <style>
-        :root {
-            --bg: #282a36;
-            --navbar: #191a21;
-            --panel: #44475a;
-            --accent: #bd93f9;
-            --text: #f8f8f2;
-            --green: #50fa7b;
-        }
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Notepad Pro</title>
+        <style>
+            :root {
+                --bg: #282a36;
+                --navbar: #191a21;
+                --panel: #44475a;
+                --accent: #bd93f9;
+                --text: #f8f8f2;
+                --green: #50fa7b;
+            }
 
-        body, html {
-            margin: 0; padding: 0; height: 100%;
-            background: var(--bg); color: var(--text);
-            font-size: 18px;
-            font-family: 'Inter', sans-serif;
-            display: flex; flex-direction: column; overflow: hidden;
-        }
+            body,
+            html {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+                background: var(--bg);
+                color: var(--text);
+                font-size: 18px;
+                font-family: 'Inter', sans-serif;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
 
-        .navbar {
-            height: 45px; background: var(--navbar);
-            display: flex; align-items: center; padding: 0 15px;
-            justify-content: space-between; border-bottom: 1px solid #000;
-            z-index: 100;
-        }
+            .navbar {
+                height: 45px;
+                background: var(--navbar);
+                display: flex;
+                align-items: center;
+                padding: 0 15px;
+                justify-content: space-between;
+                border-bottom: 1px solid #000;
+                z-index: 100;
+            }
 
-        #editor-container { flex: 1; position: relative; overflow: hidden; }
+            #editor-container {
+                flex: 1;
+                position: relative;
+                overflow: hidden;
+            }
 
-        #console-drawer {
-            height: 0; background: #111; border-top: 2px solid var(--accent);
-            transition: height 0.3s ease; overflow: hidden;
-            display: flex; flex-direction: column;
-        }
+            #console-drawer {
+                height: 0;
+                background: #111;
+                border-top: 2px solid var(--accent);
+                transition: height 0.3s ease;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
 
-        #console-drawer.open { height: 30%; }
+            #console-drawer.open {
+                height: 30%;
+            }
 
-        #console-header {
-            padding: 5px 15px; font-size: 16px; 
-            background: #1d1d1d; color: var(--accent);
-            display: flex; justify-content: space-between;
-        }
+            #console-header {
+                padding: 5px 15px;
+                font-size: 16px;
+                background: #1d1d1d;
+                color: var(--accent);
+                display: flex;
+                justify-content: space-between;
+            }
 
-        #console-output {
-            flex: 1; padding: 10px; font-family: 'Fira Code', monospace;
-            font-size: 14px; color: var(--green); overflow-y: auto;
-            white-space: pre-wrap;
-        }
+            #console-output {
+                flex: 1;
+                padding: 10px;
+                font-family: 'Fira Code', monospace;
+                font-size: 14px;
+                color: var(--green);
+                overflow-y: auto;
+                white-space: pre-wrap;
+            }
 
-        .cm-editor { height: 100% !important; }
-        /* Word Wrap Fix */
-        .cm-content { white-space: pre-wrap !important; word-break: break-word !important; }
-    </style>
-</head>
-<body>
+            .cm-editor {
+                height: 100% !important;
+            }
 
-    <div class="navbar">
-        <div>
-            <span style="font-size: 12px; color: #6272a4;">JS Mode | Ctrl + ~ for Console;</span>
-        </div>
-        <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
-    </div>
-
-    <div id="editor-container"></div>
-
-    <div id="console-drawer">
-        <div id="console-header">
-            <span>CONSOLE OUTPUT</span>
+            /* Word Wrap Fix */
+            .cm-content {
+                white-space: pre-wrap !important;
+                word-break: break-word !important;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="navbar">
             <div>
-	            <span onclick="clearConsole()" style="cursor:pointer; margin-right: 20px;">[Clear]</span>
-	            <span onclick="toggleConsole()" style="cursor:pointer">[Close]</span>
+                <span style="font-size: 12px; color: #6272a4;">JS Mode | Ctrl + ~ for Console;</span>
             </div>
+            <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
         </div>
-        <div id="console-output"></div>
-    </div>
-
-    <script type="module">
-        import { EditorView, basicSetup } from "https://esm.sh/codemirror";
-        import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
-        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
-        import { keymap } from "https://esm.sh/@codemirror/view";
-        import { searchKeymap } from "https://esm.sh/@codemirror/search";
-
-        const output = document.getElementById('console-output');
-        const drawer = document.getElementById('console-drawer');
-        const indicator = document.getElementById('save-indicator');
-
-        // --- 1. Debounce Logic ---
-        let saveTimeout;
-        const debouncedSave = (content) => {
-            indicator.innerText = "⏳ Typing...";
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
-                localStorage.setItem('notepadContent', content);
-                indicator.innerText = "✅ Saved";
-            }, 1000); // 1000ms delay
-        };
-
-        // --- Console Logic ---
-        const logToConsole = (...args) => {
-            const formatted = args.map(arg => 
-                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
-            ).join(' ');
-            output.innerText += `\n> ${formatted}`;
-            output.scrollTop = output.scrollHeight;
-        };
-
-        window.runCode = () => {
-            if (!drawer.classList.contains('open')) toggleConsole();
-            const code = view.state.doc.toString();
-            const wrappedCode = `(async () => { 
+        <div id="editor-container"></div>
+        <div id="console-drawer">
+            <div id="console-header">
+                <span>CONSOLE OUTPUT</span>
+                <div>
+                    <span onclick="clearConsole()" style="cursor:pointer; margin-right: 20px;">[Clear]</span>
+                    <span onclick="toggleConsole()" style="cursor:pointer">[Close]</span>
+                </div>
+            </div>
+            <div id="console-output"></div>
+        </div>
+        <script type="module">
+            import {
+                EditorView,
+                basicSetup
+            } from "https://esm.sh/codemirror";
+            import {
+                javascript
+            } from "https://esm.sh/@codemirror/lang-javascript";
+            import {
+                oneDark
+            } from "https://esm.sh/@codemirror/theme-one-dark";
+            import {
+                keymap
+            } from "https://esm.sh/@codemirror/view";
+            import {
+                searchKeymap
+            } from "https://esm.sh/@codemirror/search";
+            import prettier from "https://esm.sh/prettier@3.0.3/standalone";
+            import parserBabel from "https://esm.sh/prettier@3.0.3/plugins/babel";
+            import parserEstree from "https://esm.sh/prettier@3.0.3/plugins/estree";
+            const output = document.getElementById('console-output');
+            const drawer = document.getElementById('console-drawer');
+            const indicator = document.getElementById('save-indicator');
+            // --- 1. Debounce Logic ---
+            let saveTimeout;
+            const debouncedSave = (content) => {
+                indicator.innerText = "⏳ Typing...";
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => {
+                    localStorage.setItem('notepadContent', content);
+                    indicator.innerText = "✅ Saved";
+                }, 1000); // 1000ms delay
+            };
+            // --- Console Logic ---
+            const logToConsole = (...args) => {
+                const formatted = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+                output.innerText += `\n> ${formatted}`;
+                output.scrollTop = output.scrollHeight;
+            };
+            window.runCode = () => {
+                if (!drawer.classList.contains('open')) toggleConsole();
+                const code = view.state.doc.toString();
+                const wrappedCode = `(async () => { 
                 const console = { log: (...args) => window.parentLog(...args) };
                 try { ${code} } catch(e) { console.log('Error: ' + e.message) }
             })()`;
-            window.parentLog = logToConsole;
-            new Function(wrappedCode)();
-        };
-
-        window.toggleConsole = () => {
-            drawer.classList.toggle('open');
-            setTimeout(() => view.focus(), 350);
-        };
-
-        window.clearConsole = () => {
-            output.innerText = "";
-        };
-
-        // --- 2. Editor Setup with Autofocus ---
-        const view = new EditorView({
-            doc: localStorage.getItem('notepadContent') || "",
-            extensions: [
-                basicSetup,
-                javascript(),
-                oneDark,
-                EditorView.lineWrapping, // Enable Word Wrap
-                keymap.of(searchKeymap),
-                EditorView.updateListener.of((update) => {
-                    if (update.docChanged) {
-                        debouncedSave(update.state.doc.toString());
+                window.parentLog = logToConsole;
+                new Function(wrappedCode)();
+            };
+            window.toggleConsole = () => {
+                drawer.classList.toggle('open');
+                setTimeout(() => view.focus(), 350);
+            };
+            window.clearConsole = () => {
+                output.innerText = "";
+            };
+            // --- 2. Editor Setup with Autofocus ---
+            const view = new EditorView({
+                doc: localStorage.getItem('notepadContent') || "",
+                extensions: [
+                    basicSetup,
+                    javascript(),
+                    oneDark,
+                    EditorView.lineWrapping, // Enable Word Wrap
+                    keymap.of(searchKeymap),
+                    EditorView.updateListener.of((update) => {
+                        if (update.docChanged) {
+                            debouncedSave(update.state.doc.toString());
+                        }
+                    })
+                ],
+                parent: document.getElementById('editor-container')
+            });
+            // Formatting
+            window.formatCode = async () => {
+                const currentCode = view.state.doc.toString();
+                try {
+                    const formatted = await prettier.format(currentCode, {
+                        parser: "babel",
+                        plugins: [parserBabel, parserEstree],
+                        semi: true,
+                        singleQuote: true,
+                    });
+                    // Replace the editor content with formatted code
+                    view.dispatch({
+                        changes: {
+                            from: 0,
+                            to: view.state.doc.length,
+                            insert: formatted
+                        }
+                    });
+                    indicator.innerText = "✨ Formatted";
+                } catch (err) {
+                    logToConsole("Format Error: " + err.message);
+                }
+            };
+            // Autofocus on load
+            view.focus();
+            // Shortcuts
+            window.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && (e.key === '`' || e.key === '~')) {
+                    e.preventDefault();
+                    toggleConsole();
+                }
+                window.addEventListener('keydown', (e) => {
+                    if (e.altKey && e.key === 'Backspace') {
+                        e.preventDefault();
+                        clearConsole();
                     }
-                })
-            ],
-            parent: document.getElementById('editor-container')
-        });
-
-        // Autofocus on load
-        view.focus();
-
-        // Shortcuts
-        window.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && (e.key === '`' || e.key === '~')) {
-                e.preventDefault();
-                toggleConsole();
-            }
-		window.addEventListener('keydown', (e) => {
-		    if (e.altKey && e.key === 'Backspace') {
-		        e.preventDefault();
-		        clearConsole();			        
-		    }
-		});
-        if (e.altKey && e.key === 'Enter') {
-            e.preventDefault();
-            runCode();
-        }
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            const blob = new Blob([view.state.doc.toString()], {type: 'text/plain'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.download = 'note.js'; a.href = url; a.click();
-        }
-        });
-
-        window.view = view;
-    </script>
-</body>
+                });
+                if (e.altKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    runCode();
+                }
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    const blob = new Blob([view.state.doc.toString()], {
+                        type: 'text/plain'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.download = 'note.js';
+                    a.href = url;
+                    a.click();
+                }
+                // Shift + Alt + F to Format
+                if (e.shiftKey && e.altKey && e.key.toLowerCase() === 'f') {
+                    e.preventDefault();
+                    formatCode();
+                }
+            });
+            window.view = view;
+        </script>
+    </body>
 </html>
