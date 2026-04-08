@@ -92,7 +92,7 @@
     <body>
         <div class="navbar">
             <div>
-                <span style="font-size: 12px; color: #6272a4;">JS Mode | Ctrl + ~ for Console;</span>
+                <span style="font-size: 12px; color: #6272a4;">JS Mode | Alt+Enter: Run | Ctrl+S: Save | Ctrl+Shift+F: Format</span>
             </div>
             <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
         </div>
@@ -108,28 +108,21 @@
             <div id="console-output"></div>
         </div>
         <script type="module">
-            import {
-                EditorView,
-                basicSetup
-            } from "https://esm.sh/codemirror";
-            import {
-                javascript
-            } from "https://esm.sh/@codemirror/lang-javascript";
-            import {
-                oneDark
-            } from "https://esm.sh/@codemirror/theme-one-dark";
-            import {
-                keymap
-            } from "https://esm.sh/@codemirror/view";
-            import {
-                searchKeymap
-            } from "https://esm.sh/@codemirror/search";
+            import { EditorView, basicSetup } from "https://esm.sh/codemirror";
+            import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
+            import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
+            import { keymap } from "https://esm.sh/@codemirror/view";
+            import { indentWithTab } from "https://esm.sh/@codemirror/commands";
+            import { indentUnit } from "https://esm.sh/@codemirror/language";
+            import { searchKeymap } from "https://esm.sh/@codemirror/search";
             import prettier from "https://esm.sh/prettier@3.0.3/standalone";
             import parserBabel from "https://esm.sh/prettier@3.0.3/plugins/babel";
             import parserEstree from "https://esm.sh/prettier@3.0.3/plugins/estree";
+
             const output = document.getElementById('console-output');
             const drawer = document.getElementById('console-drawer');
             const indicator = document.getElementById('save-indicator');
+
             // --- 1. Debounce Logic ---
             let saveTimeout;
             const debouncedSave = (content) => {
@@ -138,14 +131,16 @@
                 saveTimeout = setTimeout(() => {
                     localStorage.setItem('notepadContent', content);
                     indicator.innerText = "✅ Saved";
-                }, 1000); // 1000ms delay
+                }, 1000);
             };
+
             // --- Console Logic ---
             const logToConsole = (...args) => {
                 const formatted = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
                 output.innerText += `\n> ${formatted}`;
                 output.scrollTop = output.scrollHeight;
             };
+
             window.runCode = () => {
                 if (!drawer.classList.contains('open')) toggleConsole();
                 const code = view.state.doc.toString();
@@ -156,22 +151,29 @@
                 window.parentLog = logToConsole;
                 new Function(wrappedCode)();
             };
+
             window.toggleConsole = () => {
                 drawer.classList.toggle('open');
                 setTimeout(() => view.focus(), 350);
             };
+
             window.clearConsole = () => {
                 output.innerText = "";
             };
-            // --- 2. Editor Setup with Autofocus ---
+
+            // --- 2. Editor Setup ---
             const view = new EditorView({
                 doc: localStorage.getItem('notepadContent') || "",
                 extensions: [
                     basicSetup,
                     javascript(),
                     oneDark,
-                    EditorView.lineWrapping, // Enable Word Wrap
-                    keymap.of(searchKeymap),
+                    EditorView.lineWrapping,
+                    indentUnit.of("    "), // Set indent width to 4 spaces
+                    keymap.of([
+                        ...searchKeymap,
+                        indentWithTab // Enable Tab and Shift+Tab for indentation
+                    ]),
                     EditorView.updateListener.of((update) => {
                         if (update.docChanged) {
                             debouncedSave(update.state.doc.toString());
@@ -180,6 +182,7 @@
                 ],
                 parent: document.getElementById('editor-container')
             });
+
             // Formatting
             window.formatCode = async () => {
                 const currentCode = view.state.doc.toString();
@@ -189,55 +192,70 @@
                         plugins: [parserBabel, parserEstree],
                         semi: true,
                         singleQuote: true,
+                        tabWidth: 4, // Set Prettier to 4 spaces
                     });
-                    // Replace the editor content with formatted code
                     view.dispatch({
-                        changes: {
-                            from: 0,
-                            to: view.state.doc.length,
-                            insert: formatted
-                        }
+                        changes: { from: 0, to: view.state.doc.length, insert: formatted }
                     });
                     indicator.innerText = "✨ Formatted";
                 } catch (err) {
                     logToConsole("Format Error: " + err.message);
                 }
             };
-            // Autofocus on load
+
             view.focus();
+
             // Shortcuts
             window.addEventListener('keydown', (e) => {
-                if (e.ctrlKey && (e.key === '`' || e.key === '~')) {
+                // Toggle Console (Ctrl + `)
+                if (e.ctrlKey && (e.key === '`')) {
                     e.preventDefault();
                     toggleConsole();
                 }
-                window.addEventListener('keydown', (e) => {
-                    if (e.altKey && e.key === 'Backspace') {
-                        e.preventDefault();
-                        clearConsole();
-                    }
-                });
+
+                // Clear Console (Alt + Backspace)
+                if (e.altKey && e.key === 'Backspace') {
+                    e.preventDefault();
+                    clearConsole();
+                }
+
+                // Run Code (Alt + Enter)
                 if (e.altKey && e.key === 'Enter') {
                     e.preventDefault();
                     runCode();
                 }
+
+                // Save File (Ctrl + S)
                 if (e.ctrlKey && e.key === 's') {
                     e.preventDefault();
-                    const blob = new Blob([view.state.doc.toString()], {
-                        type: 'text/plain'
-                    });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.download = 'note.js';
-                    a.href = url;
-                    a.click();
+                    
+                    // Generate Default Date Filename (dd-mm-yy)
+                    const now = new Date();
+                    const dd = String(now.getDate()).padStart(2, '0');
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    const yy = String(now.getFullYear()).slice(-2);
+                    const defaultName = `${dd}-${mm}-${yy}.txt`;
+
+                    const fileName = prompt("Enter filename:", defaultName);
+                    
+                    if (fileName) {
+                        const blob = new Blob([view.state.doc.toString()], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.download = fileName.endsWith('.txt') || fileName.includes('.') ? fileName : fileName + '.txt';
+                        a.href = url;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
                 }
-                // CTRL + Shift + F to Format
+
+                // Format (Ctrl + Shift + F)
                 if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
                     e.preventDefault();
                     formatCode();
                 }
             });
+
             window.view = view;
         </script>
     </body>
