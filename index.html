@@ -37,6 +37,112 @@
                 justify-content: space-between;
                 border-bottom: 1px solid #000;
                 z-index: 100;
+                flex-shrink: 0;
+            }
+
+            #tab-bar {
+                display: flex;
+                align-items: flex-end;
+                background: var(--navbar);
+                border-bottom: 2px solid #000;
+                overflow-x: auto;
+                height: 34px;
+                padding: 0 8px;
+                gap: 2px;
+                flex-shrink: 0;
+                scrollbar-width: none;
+            }
+
+            #tab-bar::-webkit-scrollbar {
+                display: none;
+            }
+
+            .tab {
+                display: flex;
+                align-items: center;
+                padding: 5px 10px 5px 12px;
+                background: #1e1f2b;
+                border-radius: 6px 6px 0 0;
+                cursor: pointer;
+                font-size: 13px;
+                gap: 6px;
+                min-width: 70px;
+                max-width: 180px;
+                white-space: nowrap;
+                color: #6272a4;
+                border: 1px solid #000;
+                border-bottom: none;
+                transition: background 0.1s, color 0.1s;
+                user-select: none;
+                height: 27px;
+                box-sizing: border-box;
+            }
+
+            .tab.active {
+                background: var(--bg);
+                color: var(--text);
+                border-color: #3a3c4e;
+            }
+
+            .tab:hover:not(.active) {
+                background: #2c2e3f;
+                color: #aaa;
+            }
+
+            .tab-title {
+                flex: 1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tab-close {
+                color: #6272a4;
+                font-size: 14px;
+                line-height: 1;
+                cursor: pointer;
+                padding: 0 2px;
+                border-radius: 3px;
+                flex-shrink: 0;
+            }
+
+            .tab-close:hover {
+                color: #ff5555;
+                background: rgba(255, 85, 85, 0.15);
+            }
+
+            .tab-title-input {
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid var(--accent);
+                color: var(--text);
+                font-size: 13px;
+                width: 110px;
+                outline: none;
+                font-family: inherit;
+                padding: 0;
+            }
+
+            .tab-new {
+                padding: 0 8px;
+                background: transparent;
+                border: 1px solid #3a3c4e;
+                border-radius: 4px;
+                color: #6272a4;
+                cursor: pointer;
+                font-size: 18px;
+                line-height: 1;
+                height: 22px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-left: 4px;
+                margin-bottom: 4px;
+                flex-shrink: 0;
+            }
+
+            .tab-new:hover {
+                color: var(--accent);
+                border-color: var(--accent);
             }
 
             #editor-container {
@@ -53,6 +159,7 @@
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
+                flex-shrink: 0;
             }
 
             #console-drawer.open {
@@ -82,7 +189,6 @@
                 height: 100% !important;
             }
 
-            /* Word Wrap Fix */
             .cm-content {
                 white-space: pre-wrap !important;
                 word-break: break-word !important;
@@ -92,10 +198,11 @@
     <body>
         <div class="navbar">
             <div>
-                <span style="font-size: 12px; color: #6272a4;">JS Mode | Alt+Enter: Run | Ctrl+S: Save | Ctrl+Shift+F: Format</span>
+                <span style="font-size: 12px; color: #6272a4;">JS Mode | Alt+Enter: Run | Ctrl+S: Download | Ctrl+Shift+F: Format | Dbl-click tab to rename</span>
             </div>
             <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
         </div>
+        <div id="tab-bar"></div>
         <div id="editor-container"></div>
         <div id="console-drawer">
             <div id="console-header">
@@ -119,32 +226,189 @@
             import parserBabel from "https://esm.sh/prettier@3.0.3/plugins/babel";
             import parserEstree from "https://esm.sh/prettier@3.0.3/plugins/estree";
 
-            const output = document.getElementById('console-output');
+            const outputEl = document.getElementById('console-output');
             const drawer = document.getElementById('console-drawer');
             const indicator = document.getElementById('save-indicator');
 
-            // --- 1. Debounce Logic ---
+            // --- Tab State ---
+            let tabs = [];
+            let activeTabId = null;
+
+            function genId() {
+                return 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+            }
+
+            function loadState() {
+                const saved = localStorage.getItem('npad-tabs');
+                if (saved) {
+                    try {
+                        const state = JSON.parse(saved);
+                        tabs = state.tabs || [];
+                        activeTabId = state.activeTabId;
+                        // Validate activeTabId still exists
+                        if (!tabs.find(t => t.id === activeTabId)) {
+                            activeTabId = tabs[0]?.id ?? null;
+                        }
+                    } catch (_) {}
+                }
+                if (tabs.length === 0) {
+                    // Migrate from old single-tab storage
+                    const oldContent = localStorage.getItem('notepadContent') || '';
+                    const id = genId();
+                    tabs = [{ id, title: 'Note 1', content: oldContent }];
+                    activeTabId = id;
+                }
+            }
+
+            function saveState() {
+                localStorage.setItem('npad-tabs', JSON.stringify({ tabs, activeTabId }));
+            }
+
+            function getActiveTab() {
+                return tabs.find(t => t.id === activeTabId) ?? null;
+            }
+
+            function renderTabs() {
+                const bar = document.getElementById('tab-bar');
+                bar.innerHTML = '';
+
+                for (const tab of tabs) {
+                    const el = document.createElement('div');
+                    el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+                    el.dataset.id = tab.id;
+                    el.addEventListener('click', () => switchTab(tab.id));
+
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'tab-title';
+                    titleSpan.textContent = tab.title;
+                    titleSpan.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        startEditTitle(tab.id, titleSpan);
+                    });
+
+                    el.appendChild(titleSpan);
+
+                    if (tabs.length > 1) {
+                        const closeBtn = document.createElement('span');
+                        closeBtn.className = 'tab-close';
+                        closeBtn.textContent = '×';
+                        closeBtn.title = 'Close tab';
+                        closeBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            closeTab(tab.id);
+                        });
+                        el.appendChild(closeBtn);
+                    }
+
+                    bar.appendChild(el);
+                }
+
+                const newBtn = document.createElement('button');
+                newBtn.className = 'tab-new';
+                newBtn.textContent = '+';
+                newBtn.title = 'New tab';
+                newBtn.addEventListener('click', createTab);
+                bar.appendChild(newBtn);
+            }
+
+            function startEditTitle(id, titleSpan) {
+                const tab = tabs.find(t => t.id === id);
+                if (!tab) return;
+
+                const input = document.createElement('input');
+                input.className = 'tab-title-input';
+                input.value = tab.title;
+                titleSpan.replaceWith(input);
+                input.focus();
+                input.select();
+
+                const commit = () => {
+                    const newTitle = input.value.trim() || tab.title;
+                    tab.title = newTitle;
+                    saveState();
+                    renderTabs();
+                };
+
+                input.addEventListener('blur', commit);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                    if (e.key === 'Escape') { input.value = tab.title; input.blur(); }
+                    e.stopPropagation();
+                });
+            }
+
+            function flushActiveContent() {
+                const tab = getActiveTab();
+                if (tab) tab.content = view.state.doc.toString();
+            }
+
+            function switchTab(id) {
+                if (id === activeTabId) return;
+                flushActiveContent();
+                activeTabId = id;
+                const tab = getActiveTab();
+                view.dispatch({
+                    changes: { from: 0, to: view.state.doc.length, insert: tab.content }
+                });
+                saveState();
+                renderTabs();
+                view.focus();
+            }
+
+            function createTab() {
+                flushActiveContent();
+                const id = genId();
+                tabs.push({ id, title: 'Note ' + (tabs.length + 1), content: '' });
+                activeTabId = id;
+                view.dispatch({
+                    changes: { from: 0, to: view.state.doc.length, insert: '' }
+                });
+                saveState();
+                renderTabs();
+                view.focus();
+            }
+
+            function closeTab(id) {
+                if (tabs.length === 1) return;
+                const idx = tabs.findIndex(t => t.id === id);
+                const wasActive = activeTabId === id;
+                tabs.splice(idx, 1);
+                if (wasActive) {
+                    const next = tabs[Math.min(idx, tabs.length - 1)];
+                    activeTabId = next.id;
+                    view.dispatch({
+                        changes: { from: 0, to: view.state.doc.length, insert: next.content }
+                    });
+                }
+                saveState();
+                renderTabs();
+                if (wasActive) view.focus();
+            }
+
+            // --- Debounce Save ---
             let saveTimeout;
             const debouncedSave = (content) => {
                 indicator.innerText = "⏳ Typing...";
                 clearTimeout(saveTimeout);
                 saveTimeout = setTimeout(() => {
-                    localStorage.setItem('notepadContent', content);
+                    const tab = getActiveTab();
+                    if (tab) tab.content = content;
+                    saveState();
                     indicator.innerText = "✅ Saved";
                 }, 1000);
             };
 
-            // --- Console Logic ---
+            // --- Console ---
             const logToConsole = (...args) => {
                 const formatted = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
-                output.innerText += `\n> ${formatted}`;
-                output.scrollTop = output.scrollHeight;
+                outputEl.innerText += `\n> ${formatted}`;
+                outputEl.scrollTop = outputEl.scrollHeight;
             };
 
             window.runCode = () => {
                 if (!drawer.classList.contains('open')) toggleConsole();
                 const code = view.state.doc.toString();
-                const wrappedCode = `(async () => { 
+                const wrappedCode = `(async () => {
                 const console = { log: (...args) => window.parentLog(...args) };
                 try { ${code} } catch(e) { console.log('Error: ' + e.message) }
             })()`;
@@ -158,21 +422,24 @@
             };
 
             window.clearConsole = () => {
-                output.innerText = "";
+                outputEl.innerText = "";
             };
 
-            // --- 2. Editor Setup ---
+            // --- Editor Setup ---
+            loadState();
+            const initialContent = getActiveTab()?.content ?? '';
+
             const view = new EditorView({
-                doc: localStorage.getItem('notepadContent') || "",
+                doc: initialContent,
                 extensions: [
                     basicSetup,
                     javascript(),
                     oneDark,
                     EditorView.lineWrapping,
-                    indentUnit.of("    "), // Set indent width to 4 spaces
+                    indentUnit.of("    "),
                     keymap.of([
                         ...searchKeymap,
-                        indentWithTab // Enable Tab and Shift+Tab for indentation
+                        indentWithTab
                     ]),
                     EditorView.updateListener.of((update) => {
                         if (update.docChanged) {
@@ -183,7 +450,9 @@
                 parent: document.getElementById('editor-container')
             });
 
-            // Formatting
+            renderTabs();
+
+            // --- Formatting ---
             window.formatCode = async () => {
                 const currentCode = view.state.doc.toString();
                 try {
@@ -192,7 +461,7 @@
                         plugins: [parserBabel, parserEstree],
                         semi: true,
                         singleQuote: true,
-                        tabWidth: 4, // Set Prettier to 4 spaces
+                        tabWidth: 4,
                     });
                     view.dispatch({
                         changes: { from: 0, to: view.state.doc.length, insert: formatted }
@@ -205,51 +474,45 @@
 
             view.focus();
 
-            // Shortcuts
+            // --- Shortcuts ---
             window.addEventListener('keydown', (e) => {
-                // Toggle Console (Ctrl + `)
-                if (e.ctrlKey && (e.key === '`')) {
+                if (e.ctrlKey && e.key === '`') {
                     e.preventDefault();
                     toggleConsole();
                 }
 
-                // Clear Console (Alt + Backspace)
                 if (e.altKey && e.key === 'Backspace') {
                     e.preventDefault();
                     clearConsole();
                 }
 
-                // Run Code (Alt + Enter)
                 if (e.altKey && e.key === 'Enter') {
                     e.preventDefault();
                     runCode();
                 }
 
-                // Save File (Ctrl + S)
-                if (e.ctrlKey && e.key === 's') {
+                if (e.ctrlKey && !e.shiftKey && e.key === 's') {
                     e.preventDefault();
-                    
-                    // Generate Default Date Filename (dd-mm-yy)
-                    const now = new Date();
-                    const dd = String(now.getDate()).padStart(2, '0');
-                    const mm = String(now.getMonth() + 1).padStart(2, '0');
-                    const yy = String(now.getFullYear()).slice(-2);
-                    const defaultName = `${dd}-${mm}-${yy}.txt`;
-
-                    const fileName = prompt("Enter filename:", defaultName);
-                    
+                    const tab = getActiveTab();
+                    const defaultName = tab ? tab.title : (() => {
+                        const now = new Date();
+                        const dd = String(now.getDate()).padStart(2, '0');
+                        const mm = String(now.getMonth() + 1).padStart(2, '0');
+                        const yy = String(now.getFullYear()).slice(-2);
+                        return `${dd}-${mm}-${yy}`;
+                    })();
+                    const fileName = prompt("Enter filename:", defaultName + '.txt');
                     if (fileName) {
                         const blob = new Blob([view.state.doc.toString()], { type: 'text/plain' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
-                        a.download = fileName.endsWith('.txt') || fileName.includes('.') ? fileName : fileName + '.txt';
+                        a.download = fileName.includes('.') ? fileName : fileName + '.txt';
                         a.href = url;
                         a.click();
                         URL.revokeObjectURL(url);
                     }
                 }
 
-                // Format (Ctrl + Shift + F)
                 if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
                     e.preventDefault();
                     formatCode();
