@@ -198,7 +198,7 @@
     <body>
         <div class="navbar">
             <div>
-                <span style="font-size: 12px; color: #6272a4;">JS Mode | Alt+Enter: Run | Ctrl+S: Download | Ctrl+Shift+F: Format | Dbl-click tab to rename</span>
+                <span style="font-size: 12px; color: #6272a4;">JS Mode | Alt+Enter: Run | Ctrl+S: Download | Ctrl+Shift+F: Format | Ctrl+Z: Restore tab | Dbl-click tab to rename</span>
             </div>
             <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
         </div>
@@ -233,6 +233,7 @@
             // --- Tab State ---
             let tabs = [];
             let activeTabId = null;
+            let closedTabsHistory = [];
 
             function genId() {
                 return 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
@@ -368,9 +369,27 @@
                 view.focus();
             }
 
+            function restoreLastClosedTab() {
+                if (closedTabsHistory.length === 0) return;
+                flushActiveContent();
+                const { tab, idx } = closedTabsHistory.pop();
+                const insertAt = Math.min(idx, tabs.length);
+                tabs.splice(insertAt, 0, tab);
+                activeTabId = tab.id;
+                view.dispatch({
+                    changes: { from: 0, to: view.state.doc.length, insert: tab.content }
+                });
+                saveState();
+                renderTabs();
+                view.focus();
+            }
+
             function closeTab(id) {
                 if (tabs.length === 1) return;
                 const idx = tabs.findIndex(t => t.id === id);
+                if (idx === -1) return;
+                flushActiveContent();
+                closedTabsHistory.push({ tab: { ...tabs[idx] }, idx });
                 const wasActive = activeTabId === id;
                 tabs.splice(idx, 1);
                 if (wasActive) {
@@ -475,6 +494,15 @@
             view.focus();
 
             // --- Shortcuts ---
+            // Capture phase so we intercept Ctrl+Z before CodeMirror's undo handler
+            window.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'z' && closedTabsHistory.length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    restoreLastClosedTab();
+                }
+            }, { capture: true });
+
             window.addEventListener('keydown', (e) => {
                 if (e.ctrlKey && e.key === '`') {
                     e.preventDefault();
