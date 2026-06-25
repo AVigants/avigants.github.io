@@ -84,6 +84,14 @@
                 border-color: #3a3c4e;
             }
 
+            .tab.dragging {
+                opacity: 0.4;
+            }
+
+            .tab.drag-over {
+                cursor: grabbing;
+            }
+
             .tab:hover:not(.active) {
                 background: #2c2e3f;
                 color: #aaa;
@@ -198,7 +206,8 @@
     <body>
         <div class="navbar">
             <div>
-                <span style="font-size: 12px; color: #6272a4;">JS Mode | Alt+Enter: Run | Ctrl+S: Download | Ctrl+Shift+F: Format | Ctrl+Z: Restore tab | Dbl-click tab to rename</span>
+                <span id="mode-indicator" style="font-size: 12px; color: #6272a4; font-weight: 600;">TEXT</span>
+                <span style="font-size: 12px; color: #6272a4;"> | Alt+Enter: Run | Ctrl+S: Download | Ctrl+Shift+F: Format | Ctrl+Z: Restore tab | Dbl-click tab to rename (.js → JS mode) | Drag tabs to reorder</span>
             </div>
             <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
         </div>
@@ -216,6 +225,7 @@
         </div>
         <script type="module">
             import { EditorView, basicSetup } from "https://esm.sh/codemirror";
+            import { Compartment } from "https://esm.sh/@codemirror/state";
             import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
             import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
             import { keymap } from "https://esm.sh/@codemirror/view";
@@ -229,6 +239,26 @@
             const outputEl = document.getElementById('console-output');
             const drawer = document.getElementById('console-drawer');
             const indicator = document.getElementById('save-indicator');
+
+            // --- Language Mode ---
+            // Default is plaintext; switch to JS only when the tab name ends with .js
+            const languageConf = new Compartment();
+
+            function langExtFor(title) {
+                return (title || '').toLowerCase().endsWith('.js') ? javascript() : [];
+            }
+
+            function updateModeIndicator(title) {
+                const isJs = (title || '').toLowerCase().endsWith('.js');
+                const el = document.getElementById('mode-indicator');
+                el.textContent = isJs ? 'JS' : 'TEXT';
+                el.style.color = isJs ? 'var(--green)' : '#6272a4';
+            }
+
+            function applyLanguage(title) {
+                view.dispatch({ effects: languageConf.reconfigure(langExtFor(title)) });
+                updateModeIndicator(title);
+            }
 
             // --- Tab State ---
             let tabs = [];
@@ -269,6 +299,45 @@
                 return tabs.find(t => t.id === activeTabId) ?? null;
             }
 
+            // --- Tab Drag Reordering ---
+            function getDragAfterElement(bar, x) {
+                const els = [...bar.querySelectorAll('.tab:not(.dragging)')];
+                let closest = { offset: -Infinity, element: null };
+                for (const child of els) {
+                    const box = child.getBoundingClientRect();
+                    const offset = x - box.left - box.width / 2;
+                    if (offset < 0 && offset > closest.offset) {
+                        closest = { offset, element: child };
+                    }
+                }
+                return closest.element;
+            }
+
+            function commitTabOrder() {
+                const bar = document.getElementById('tab-bar');
+                const order = [...bar.querySelectorAll('.tab')].map(el => el.dataset.id);
+                tabs.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+                saveState();
+            }
+
+            function setupTabDragging() {
+                const bar = document.getElementById('tab-bar');
+                bar.addEventListener('dragover', (e) => {
+                    const dragging = bar.querySelector('.tab.dragging');
+                    if (!dragging) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    const after = getDragAfterElement(bar, e.clientX);
+                    const newBtn = bar.querySelector('.tab-new');
+                    if (after == null) {
+                        bar.insertBefore(dragging, newBtn);
+                    } else {
+                        bar.insertBefore(dragging, after);
+                    }
+                });
+                bar.addEventListener('drop', (e) => e.preventDefault());
+            }
+
             function renderTabs() {
                 const bar = document.getElementById('tab-bar');
                 bar.innerHTML = '';
@@ -277,7 +346,19 @@
                     const el = document.createElement('div');
                     el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
                     el.dataset.id = tab.id;
+                    el.draggable = true;
                     el.addEventListener('click', () => switchTab(tab.id));
+
+                    el.addEventListener('dragstart', (e) => {
+                        el.classList.add('dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', tab.id);
+                    });
+                    el.addEventListener('dragend', () => {
+                        el.classList.remove('dragging');
+                        commitTabOrder();
+                        renderTabs();
+                    });
 
                     const titleSpan = document.createElement('span');
                     titleSpan.className = 'tab-title';
@@ -316,6 +397,10 @@
                 const tab = tabs.find(t => t.id === id);
                 if (!tab) return;
 
+                // Disable dragging while editing so text can be selected in the input
+                const tabEl = titleSpan.closest('.tab');
+                if (tabEl) tabEl.draggable = false;
+
                 const input = document.createElement('input');
                 input.className = 'tab-title-input';
                 input.value = tab.title;
@@ -327,6 +412,8 @@
                     const newTitle = input.value.trim() || tab.title;
                     tab.title = newTitle;
                     saveState();
+                    // Renaming the active tab may flip its language mode (.js ⇄ plaintext)
+                    if (tab.id === activeTabId) applyLanguage(newTitle);
                     renderTabs();
                 };
 
@@ -351,6 +438,7 @@
                 view.dispatch({
                     changes: { from: 0, to: view.state.doc.length, insert: tab.content }
                 });
+                applyLanguage(tab.title);
                 saveState();
                 renderTabs();
                 view.focus();
@@ -359,11 +447,13 @@
             function createTab() {
                 flushActiveContent();
                 const id = genId();
-                tabs.push({ id, title: 'Note ' + (tabs.length + 1), content: '' });
+                const title = 'Note ' + (tabs.length + 1);
+                tabs.push({ id, title, content: '' });
                 activeTabId = id;
                 view.dispatch({
                     changes: { from: 0, to: view.state.doc.length, insert: '' }
                 });
+                applyLanguage(title);
                 saveState();
                 renderTabs();
                 view.focus();
@@ -379,6 +469,7 @@
                 view.dispatch({
                     changes: { from: 0, to: view.state.doc.length, insert: tab.content }
                 });
+                applyLanguage(tab.title);
                 saveState();
                 renderTabs();
                 view.focus();
@@ -398,6 +489,7 @@
                     view.dispatch({
                         changes: { from: 0, to: view.state.doc.length, insert: next.content }
                     });
+                    applyLanguage(next.title);
                 }
                 saveState();
                 renderTabs();
@@ -446,13 +538,15 @@
 
             // --- Editor Setup ---
             loadState();
-            const initialContent = getActiveTab()?.content ?? '';
+            const initialTab = getActiveTab();
+            const initialContent = initialTab?.content ?? '';
+            const initialTitle = initialTab?.title ?? '';
 
             const view = new EditorView({
                 doc: initialContent,
                 extensions: [
                     basicSetup,
-                    javascript(),
+                    languageConf.of(langExtFor(initialTitle)),
                     oneDark,
                     EditorView.lineWrapping,
                     indentUnit.of("    "),
@@ -469,7 +563,9 @@
                 parent: document.getElementById('editor-container')
             });
 
+            updateModeIndicator(initialTitle);
             renderTabs();
+            setupTabDragging();
 
             // --- Formatting ---
             window.formatCode = async () => {
