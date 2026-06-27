@@ -233,7 +233,7 @@
         <div class="navbar">
             <div>
                 <span id="mode-indicator" style="font-size: 12px; color: #6272a4; font-weight: 600;">TEXT</span>
-                <span style="font-size: 12px; color: #6272a4;"> | Alt+Enter: Run | Ctrl+S: Download | Ctrl+Shift+F: Format | Ctrl+Z: Restore tab | Dbl-click tab to rename (.js → JS, .md → Markdown) | Drag tabs to reorder</span>
+                <span style="font-size: 12px; color: #6272a4;"> | Alt+Enter: Run | Ctrl+S: Download | Ctrl+Shift+F: Format | Ctrl+Z: Restore tab | Dbl-click tab to rename (.js → JS, .md → Markdown, .html → HTML) | Drag tabs to reorder</span>
             </div>
             <div id="save-indicator" style="font-size: 12px; opacity: 0.5;">Ready</div>
         </div>
@@ -254,6 +254,7 @@
             import { Compartment } from "https://esm.sh/@codemirror/state";
             import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
             import { markdown } from "https://esm.sh/@codemirror/lang-markdown";
+            import { html } from "https://esm.sh/@codemirror/lang-html";
             import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
             import { keymap, Decoration, ViewPlugin, WidgetType } from "https://esm.sh/@codemirror/view";
             import { indentWithTab } from "https://esm.sh/@codemirror/commands";
@@ -262,6 +263,8 @@
             import prettier from "https://esm.sh/prettier@3.0.3/standalone";
             import parserBabel from "https://esm.sh/prettier@3.0.3/plugins/babel";
             import parserEstree from "https://esm.sh/prettier@3.0.3/plugins/estree";
+            import parserHtml from "https://esm.sh/prettier@3.0.3/plugins/html";
+            import parserPostcss from "https://esm.sh/prettier@3.0.3/plugins/postcss";
 
             const outputEl = document.getElementById('console-output');
             const drawer = document.getElementById('console-drawer');
@@ -269,7 +272,8 @@
 
             // --- Language Mode ---
             // Default is plaintext. The tab name's extension picks the mode:
-            //   *.js → JavaScript    *.md → live Markdown (Notion-style)    else → plaintext
+            //   *.js → JavaScript    *.md → live Markdown (Notion-style)
+            //   *.html / *.htm → HTML    else → plaintext
             const languageConf = new Compartment();
 
             // Live Markdown: render formatting inline and collapse the syntax markers,
@@ -380,6 +384,7 @@
                 const t = (title || '').toLowerCase();
                 if (t.endsWith('.js')) return 'js';
                 if (t.endsWith('.md')) return 'md';
+                if (t.endsWith('.html') || t.endsWith('.htm')) return 'html';
                 return 'text';
             }
 
@@ -387,6 +392,7 @@
                 const mode = modeForTitle(title);
                 if (mode === 'js') return javascript();
                 if (mode === 'md') return mdExtensions;
+                if (mode === 'html') return html();
                 return [];
             }
 
@@ -712,10 +718,15 @@
             // --- Formatting ---
             window.formatCode = async () => {
                 const currentCode = view.state.doc.toString();
+                const mode = modeForTitle(getActiveTab()?.title ?? '');
+                // Pick the Prettier parser from the tab's mode. HTML also needs the
+                // babel/estree + postcss plugins so embedded <script>/<style> format too.
+                const formatOpts = mode === 'html'
+                    ? { parser: "html", plugins: [parserHtml, parserBabel, parserEstree, parserPostcss] }
+                    : { parser: "babel", plugins: [parserBabel, parserEstree] };
                 try {
                     const formatted = await prettier.format(currentCode, {
-                        parser: "babel",
-                        plugins: [parserBabel, parserEstree],
+                        ...formatOpts,
                         semi: true,
                         singleQuote: true,
                         tabWidth: 4,
